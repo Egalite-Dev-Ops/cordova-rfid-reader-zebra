@@ -1,0 +1,17 @@
+{
+  "name": "cordova-rfid-reader-zebra",
+  "version": "1.0.0",
+  "description": "RFID reader plugin",
+  "cordova": {
+    "id": "rfidReader",
+    "platforms": [
+      "android"
+    ]
+  },
+  "keywords": [
+    "ecosystem:cordova",
+    "cordova-android"
+  ],
+  "author": "EGALITE",
+  "license": "ISC"
+}
