@@ -1,4 +1,7 @@
-# CORDOVA RFID SCANNER PLUGIN FOR RFD40 DEVICE  
+# CORDOVA RFID SCANNER PLUGIN FOR RFID HH DEVICE  
+#### Installation
+
+`cordova plugin add https://github.com/Egalite-Dev-Ops/cordova-rfid-reader-zebra.git`
 
 #### Methods
 For start scanning and subscribe to device use:
