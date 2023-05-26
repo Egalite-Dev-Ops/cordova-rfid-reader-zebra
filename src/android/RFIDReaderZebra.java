@@ -3,9 +3,13 @@ package rfidReader;
 import android.os.AsyncTask;
 import android.util.Log;
 
+import com.zebra.rfid.api3.ACCESS_OPERATION_CODE;
+import com.zebra.rfid.api3.ACCESS_OPERATION_STATUS;
+import com.zebra.rfid.api3.Antennas;
 import com.zebra.rfid.api3.ENUM_TRANSPORT;
 import com.zebra.rfid.api3.ENUM_TRIGGER_MODE;
 import com.zebra.rfid.api3.HANDHELD_TRIGGER_EVENT_TYPE;
+import com.zebra.rfid.api3.INVENTORY_STATE;
 import com.zebra.rfid.api3.InvalidUsageException;
 import com.zebra.rfid.api3.OperationFailureException;
 import com.zebra.rfid.api3.RFIDReader;
@@ -14,6 +18,8 @@ import com.zebra.rfid.api3.Readers;
 import com.zebra.rfid.api3.RfidEventsListener;
 import com.zebra.rfid.api3.RfidReadEvents;
 import com.zebra.rfid.api3.RfidStatusEvents;
+import com.zebra.rfid.api3.SESSION;
+import com.zebra.rfid.api3.SL_FLAG;
 import com.zebra.rfid.api3.START_TRIGGER_TYPE;
 import com.zebra.rfid.api3.STATUS_EVENT_TYPE;
 import com.zebra.rfid.api3.STOP_TRIGGER_TYPE;
@@ -44,10 +50,12 @@ public class RFIDReaderZebra extends CordovaPlugin implements Readers.RFIDReader
   //private static ArrayList<ReaderDevice> availableRFIDReaderList;
   private static ReaderDevice readerDevice;
   private static RFIDReader reader;
-  private static String TAG = "DEMO";
+  private static String TAG = "EGA";
   private EventHandler eventHandler;
   //private RFIDHandler rfidScannerHandler;
+  private int MAX_POWER = 300;
 
+    
   private void initDataCache() {
     try {
       this.tagDataSet.clear();
@@ -97,6 +105,7 @@ public class RFIDReaderZebra extends CordovaPlugin implements Readers.RFIDReader
   }
 
   private void ConfigureReader() {
+    Log.d(TAG, "ConfigureReader " + reader.getHostName());
     if (reader.isConnected()) {
       TriggerInfo triggerInfo = new TriggerInfo();
       triggerInfo.StartTrigger.setTriggerType(START_TRIGGER_TYPE.START_TRIGGER_TYPE_IMMEDIATE);
@@ -111,40 +120,88 @@ public class RFIDReaderZebra extends CordovaPlugin implements Readers.RFIDReader
         reader.Events.setHandheldEvent(true);
         // tag event with tag data
         reader.Events.setTagReadEvent(true);
-        // causing errors!!!
-        //reader.Events.setAttachTagDataWithReadEvent(true);
+        reader.Events.setAttachTagDataWithReadEvent(false);
         // set trigger mode as rfid so scanner beam will not come
         reader.Config.setTriggerMode(ENUM_TRIGGER_MODE.RFID_MODE, true);
         // set start and stop triggers
         reader.Config.setStartTrigger(triggerInfo.StartTrigger);
         reader.Config.setStopTrigger(triggerInfo.StopTrigger);
-      } catch (InvalidUsageException e) {
-        e.printStackTrace();
-      } catch (OperationFailureException e) {
+        // power levels are index based so maximum power supported get the last one
+        MAX_POWER = reader.ReaderCapabilities.getTransmitPowerLevelValues().length - 1;
+        // set antenna configurations
+        Antennas.AntennaRfConfig config = reader.Config.Antennas.getAntennaRfConfig(1);
+        config.setTransmitPowerIndex(MAX_POWER);
+        config.setrfModeTableIndex(0);
+        config.setTari(0);
+        reader.Config.Antennas.setAntennaRfConfig(1, config);
+        // Set the singulation control
+        Antennas.SingulationControl s1_singulationControl = reader.Config.Antennas.getSingulationControl(1);
+        s1_singulationControl.setSession(SESSION.SESSION_S0);
+        s1_singulationControl.Action.setInventoryState(INVENTORY_STATE.INVENTORY_STATE_A);
+        s1_singulationControl.Action.setSLFlag(SL_FLAG.SL_ALL);
+        reader.Config.Antennas.setSingulationControl(1, s1_singulationControl);
+        // delete any prefilters
+        reader.Actions.PreFilters.deleteAll();
+        //
+      } catch (InvalidUsageException | OperationFailureException e) {
         e.printStackTrace();
       }
     }
   }
+  
+  /*private class CreateInstanceTask extends AsyncTask<Void, Void, Void> {
 
+    @Override
+    protected Void doInBackground(Void... voids) {
+      Log.d(TAG, "CreateInstanceTask");
+      // Based on support available on host device choose the reader type
+      InvalidUsageException invalidUsageException = null;
+      readers = new Readers(webView.getContext(), ENUM_TRANSPORT.ALL);
+      try {
+        availableRFIDReaderList = readers.GetAvailableRFIDReaderList();
+      } catch (InvalidUsageException e) {
+        e.printStackTrace();
+      }
+      if (invalidUsageException != null) {
+        readers.Dispose();
+        readers = null;
+        if (readers == null) {
+          readers = new Readers(webView.getContext(), ENUM_TRANSPORT.BLUETOOTH);
+        }
+      }
+      return null;
+    }
+
+    @Override
+    protected void onPostExecute(Void aVoid) {
+      super.onPostExecute(aVoid);
+      connectReader();
+    }
+  }*/
+  
   private class ConnectionTask extends AsyncTask<Void, Void, Boolean> {
 
     @Override
     protected Boolean doInBackground(Void... voids) {
       try {
         if (readers != null) {
-          if (readers.GetAvailableRFIDReaderList() != null) {
-            ArrayList<ReaderDevice> availableRFIDReaderList = readers.GetAvailableRFIDReaderList();
-            if (availableRFIDReaderList.size() != 0) {
-              // get first reader from list
-              readerDevice = availableRFIDReaderList.get(0);
-              reader = readerDevice.getRFIDReader();
-              if (!reader.isConnected()) {
-                // Establish connection to the RFID Reader
-                reader.connect();
-                ConfigureReader();
-                return true;
+          try {
+            if (readers.GetAvailableRFIDReaderList() != null) {
+              ArrayList<ReaderDevice> availableRFIDReaderList = readers.GetAvailableRFIDReaderList();
+              if (availableRFIDReaderList.size() != 0) {
+                // get first reader from list
+                readerDevice = availableRFIDReaderList.get(0);
+                reader = readerDevice.getRFIDReader();
+                if (!reader.isConnected()) {
+                  // Establish connection to the RFID Reader
+                  reader.connect();
+                  ConfigureReader();
+                  return true;
+                }
               }
             }
+          } catch (InvalidUsageException ie) {
+
           }
         }
       } catch (InvalidUsageException e) {
@@ -181,7 +238,7 @@ public class RFIDReaderZebra extends CordovaPlugin implements Readers.RFIDReader
     //rfidScannerHandler.onCreate(this);
 // SDK
     if (readers == null) {
-      readers = new Readers(webView.getContext(), ENUM_TRANSPORT.SERVICE_SERIAL);
+      readers = new Readers(webView.getContext(), ENUM_TRANSPORT.ALL);
       readers.attach(this);
     }
     new ConnectionTask().execute();
@@ -198,7 +255,30 @@ public class RFIDReaderZebra extends CordovaPlugin implements Readers.RFIDReader
       keepCallbackContext = null;
     }
   }
-
+  private synchronized String connect() {
+    if (reader != null) {
+      Log.d(TAG, "connect " + reader.getHostName());
+      try {
+        if (!reader.isConnected()) {
+          // Establish connection to the RFID Reader
+          reader.connect();
+          ConfigureReader();
+          if (reader.isConnected()) {
+            return "Connected: " + reader.getHostName();
+          }
+        }
+      } catch (InvalidUsageException e) {
+        e.printStackTrace();
+      } catch (OperationFailureException e) {
+        e.printStackTrace();
+        Log.d(TAG, "OperationFailureException " + e.getVendorMessage());
+        String des = e.getResults().toString();
+        return "Connection failed" + e.getVendorMessage() + " " + des;
+      }
+    }
+    return "";
+  }
+  
   private synchronized void disconnect() {
     Log.d(TAG, "disconnect " + reader);
     try {
