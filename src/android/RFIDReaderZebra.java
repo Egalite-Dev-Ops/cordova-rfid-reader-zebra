@@ -185,23 +185,19 @@ public class RFIDReaderZebra extends CordovaPlugin implements Readers.RFIDReader
     protected Boolean doInBackground(Void... voids) {
       try {
         if (readers != null) {
-          try {
-            if (readers.GetAvailableRFIDReaderList() != null) {
-              ArrayList<ReaderDevice> availableRFIDReaderList = readers.GetAvailableRFIDReaderList();
-              if (availableRFIDReaderList.size() != 0) {
-                // get first reader from list
-                readerDevice = availableRFIDReaderList.get(0);
-                reader = readerDevice.getRFIDReader();
-                if (!reader.isConnected()) {
-                  // Establish connection to the RFID Reader
-                  reader.connect();
-                  ConfigureReader();
-                  return true;
-                }
+          if (readers.GetAvailableRFIDReaderList() != null) {
+            ArrayList<ReaderDevice> availableRFIDReaderList = readers.GetAvailableRFIDReaderList();
+            if (availableRFIDReaderList.size() != 0) {
+              // get first reader from list
+              readerDevice = availableRFIDReaderList.get(0);
+              reader = readerDevice.getRFIDReader();
+              if (!reader.isConnected()) {
+                // Establish connection to the RFID Reader
+                reader.connect();
+                ConfigureReader();
+                return true;
               }
             }
-          } catch (InvalidUsageException ie) {
-
           }
         }
       } catch (InvalidUsageException e) {
